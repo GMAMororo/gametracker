@@ -45,6 +45,20 @@ interface Notification {
 }
 
 function App() {
+  // ===========================================================================
+  // 🚨 CONFIGURAÇÃO DA CONEXÃO (AQUI ESTÁ A VARIÁVEL!) 🚨
+  // ===========================================================================
+  const SUA_URL_DO_RENDER = 'https://gametracker-spfg.onrender.com'; // Já coloquei seu link aqui!
+
+  // Lógica automática: Se estiver no seu PC, usa localhost. Se estiver na Vercel, usa o Render.
+  const API_URL = window.location.hostname.includes('localhost')
+    ? 'http://localhost:3000' 
+    : SUA_URL_DO_RENDER;
+  
+  // Aplica a configuração
+  axios.defaults.baseURL = API_URL;
+  // ===========================================================================
+
   // --- LOGIN AUTOMÁTICO ---
   const [user, setUser] = useState<any>(() => {
     try {
@@ -148,7 +162,6 @@ function App() {
   const getPrecoLoja = (deal: GameDetailsDeal, jogoBase: Game) => {
       // Se for Steam (ID 1) e o jogo base já tiver preço regional confirmado
       if (deal.storeID === '1' && jogoBase.isRegionalPrice) {
-          // Passa true explicitamente para não converter
           const precoReal = jogoBase.salePrice || jogoBase.cheapest || 0;
           return formatarPreco(precoReal, true);
       }
@@ -299,21 +312,15 @@ function App() {
       
       if (resp.data && resp.data.length > 0) {
         setTodosJogos(prev => {
+          const normalize = (str: string) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
           const listaAtual = pagina === 0 ? [] : [...prev];
-          
-          // LÓGICA DE DEDUPLICAÇÃO SIMPLIFICADA E SEGURA
-          // Usa gameID como chave principal para unicidade. Se não tiver, usa título.
           const mapaUnico = new Map();
           
-          listaAtual.forEach(g => mapaUnico.set(g.gameID || g.title, g));
-          
+          listaAtual.forEach(g => mapaUnico.set(normalize(g.title || ''), g));
           resp.data.forEach((g: Game) => {
-             // Só adiciona se não existir
-             if (!mapaUnico.has(g.gameID || g.title)) {
-                 mapaUnico.set(g.gameID || g.title, g);
-             }
+             const key = normalize(g.title || '');
+             if (!mapaUnico.has(key)) mapaUnico.set(key, g);
           });
-
           return Array.from(mapaUnico.values());
         });
         setPaginaTodos(pagina);
