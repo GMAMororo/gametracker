@@ -1,0 +1,35 @@
+// 1. Configuração do Client e Database
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 2. Modelo de Usuário
+model User {
+  id       Int    @id @default(autoincrement())
+  email    String @unique
+  name     String
+  password String
+  games    Game[]
+
+  @@map("users")
+}
+
+// 3. Modelo do Jogo
+model Game {
+  id      Int    @id @default(autoincrement())
+  steamId String
+  title   String
+  image   String
+  price   Float
+  status  String @default("JOGANDO") // JOGANDO, ZERADO, DESEJO
+  
+  userId  Int
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("games")
+}
