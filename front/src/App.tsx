@@ -45,20 +45,6 @@ interface Notification {
 }
 
 function App() {
-  // ===========================================================================
-  // 🚨 CONFIGURAÇÃO DA CONEXÃO (AQUI ESTÁ A VARIÁVEL!) 🚨
-  // ===========================================================================
-  const SUA_URL_DO_RENDER = 'https://gametracker-spfg.onrender.com'; // Já coloquei seu link aqui!
-
-  // Lógica automática: Se estiver no seu PC, usa localhost. Se estiver na Vercel, usa o Render.
-  const API_URL = window.location.hostname.includes('localhost')
-    ? 'http://localhost:3000' 
-    : SUA_URL_DO_RENDER;
-  
-  // Aplica a configuração
-  axios.defaults.baseURL = API_URL;
-  // ===========================================================================
-
   // --- LOGIN AUTOMÁTICO ---
   const [user, setUser] = useState<any>(() => {
     try {
@@ -162,6 +148,7 @@ function App() {
   const getPrecoLoja = (deal: GameDetailsDeal, jogoBase: Game) => {
       // Se for Steam (ID 1) e o jogo base já tiver preço regional confirmado
       if (deal.storeID === '1' && jogoBase.isRegionalPrice) {
+          // CORREÇÃO: Verifica salePrice OU cheapest para evitar "Grátis" falso
           const precoReal = jogoBase.salePrice || jogoBase.cheapest || 0;
           return formatarPreco(precoReal, true);
       }
