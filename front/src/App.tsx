@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Gamepad2, Search, Library, LogOut, User, Lock, Mail, PlusCircle, ExternalLink, ShoppingBag, AlertTriangle, X, Menu, Trash2, FileText, Info, Settings, Monitor, Gift, Dice5, ArrowRightCircle, HelpCircle, Plus, CheckCircle, Trophy, Heart, PlayCircle } from 'lucide-react';
+import { Gamepad2, Search, Library, LogOut, User, Lock, Mail, PlusCircle, ExternalLink, ShoppingBag, AlertTriangle, X, Menu, Trash2, FileText, Info, Settings, Monitor, Gift, Dice5, ArrowRightCircle, HelpCircle, CheckCircle, Trophy, Heart, PlayCircle } from 'lucide-react';
 
 // --- TIPOS ---
 interface Game {
@@ -45,17 +45,6 @@ interface Notification {
 }
 
 function App() {
-  // ===========================================================================
-  // CONFIGURAÇÃO DA URL DA API
-  // ===========================================================================
-  const SUA_URL_DO_RENDER = 'https://gametracker-spfg.onrender.com'; // Seu link aqui!
-
-  const API_URL = window.location.hostname.includes('localhost')
-    ? 'http://localhost:3000' 
-    : SUA_URL_DO_RENDER;
-  
-  axios.defaults.baseURL = API_URL;
-
   // --- LOGIN AUTOMÁTICO ---
   const [user, setUser] = useState<any>(() => {
     try {
@@ -159,6 +148,7 @@ function App() {
   const getPrecoLoja = (deal: GameDetailsDeal, jogoBase: Game) => {
       // Se for Steam (ID 1) e o jogo base já tiver preço regional confirmado
       if (deal.storeID === '1' && jogoBase.isRegionalPrice) {
+          // Passa true explicitamente para não converter
           const precoReal = jogoBase.salePrice || jogoBase.cheapest || 0;
           return formatarPreco(precoReal, true);
       }
@@ -206,7 +196,7 @@ function App() {
       if (sid && sid !== 'custom') {
           buscarDescricaoSteam(sid as string);
       } else {
-          setDescricaoJogo('Descrição indisponível para este título.');
+          setDescricaoJogo('Descrição indisponível.');
       }
     } else {
       setLojasDoJogoSelecionado([]);
@@ -309,15 +299,21 @@ function App() {
       
       if (resp.data && resp.data.length > 0) {
         setTodosJogos(prev => {
-          const normalize = (str: string) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
           const listaAtual = pagina === 0 ? [] : [...prev];
+          
+          // LÓGICA DE DEDUPLICAÇÃO SIMPLIFICADA E SEGURA
+          // Usa gameID como chave principal para unicidade. Se não tiver, usa título.
           const mapaUnico = new Map();
           
-          listaAtual.forEach(g => mapaUnico.set(normalize(g.title || ''), g));
+          listaAtual.forEach(g => mapaUnico.set(g.gameID || g.title, g));
+          
           resp.data.forEach((g: Game) => {
-             const key = normalize(g.title || '');
-             if (!mapaUnico.has(key)) mapaUnico.set(key, g);
+             // Só adiciona se não existir
+             if (!mapaUnico.has(g.gameID || g.title)) {
+                 mapaUnico.set(g.gameID || g.title, g);
+             }
           });
+
           return Array.from(mapaUnico.values());
         });
         setPaginaTodos(pagina);
