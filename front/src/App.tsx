@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Gamepad2, Search, Library, LogOut, User, Lock, Mail, PlusCircle, ExternalLink, ShoppingBag, AlertTriangle, X, Menu, Trash2, FileText, Info, Settings, Monitor, Gift, Dice5, ArrowRightCircle, HelpCircle, CheckCircle, Trophy, Heart, PlayCircle } from 'lucide-react';
+import { Gamepad2, Search, Library, LogOut, User, Lock, Mail, PlusCircle, ExternalLink, ShoppingBag, AlertTriangle, X, Menu, Trash2, FileText, Info, Settings, Monitor, Gift, Dice5, ArrowRightCircle, HelpCircle, Plus, CheckCircle, Trophy, Heart, PlayCircle } from 'lucide-react';
 
 // --- TIPOS ---
 interface Game {
@@ -45,10 +45,14 @@ interface Notification {
 }
 
 function App() {
-  // --- CONFIGURAÇÃO DA API (CORRIGIDA) ---
+  // ===========================================================================
+  // CONFIGURAÇÃO DA URL DA API
+  // ===========================================================================
+  const SUA_URL_DO_RENDER = 'https://gametracker-spfg.onrender.com'; // Seu link aqui!
+
   const API_URL = window.location.hostname.includes('localhost')
     ? 'http://localhost:3000' 
-    : 'https://gametracker-api.onrender.com'; // Ajuste se necessário
+    : SUA_URL_DO_RENDER;
   
   axios.defaults.baseURL = API_URL;
 
