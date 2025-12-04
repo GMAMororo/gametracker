@@ -48,7 +48,7 @@ function App() {
   // ===========================================================================
   // 🚨 CONFIGURAÇÃO DA CONEXÃO 🚨
   // ===========================================================================
-  const SUA_URL_DO_RENDER = 'https://gametracker-spfg.onrender.com'; 
+  const SUA_URL_DO_RENDER = 'https://gametracker-api-g9np.onrender.com'; 
 
   // Lógica corrigida: Agora usamos a variável SUA_URL_DO_RENDER explicitamente
   const API_URL = window.location.hostname.includes('localhost')
