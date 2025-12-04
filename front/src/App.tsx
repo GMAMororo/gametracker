@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Gamepad2, Search, Library, LogOut, User, Lock, Mail, PlusCircle, ExternalLink, ShoppingBag, AlertTriangle, X, Menu, Trash2, FileText, Info, Settings, Monitor, Gift, Dice5, ArrowRightCircle, HelpCircle, CheckCircle, Trophy, Heart, PlayCircle } from 'lucide-react';
+import { Gamepad2, Search, Library, LogOut, User, Lock, Mail, PlusCircle, ExternalLink, ShoppingBag, AlertTriangle, X, Menu, Trash2, FileText, Info, Settings, Monitor, Gift, Dice5, ArrowRightCircle, HelpCircle, CheckCircle, Trophy, Heart, PlayCircle, WifiOff } from 'lucide-react';
 
 // --- TIPOS ---
 interface Game {
@@ -45,6 +45,18 @@ interface Notification {
 }
 
 function App() {
+  // ===========================================================================
+  // 🚨 CONFIGURAÇÃO DA CONEXÃO 🚨
+  // ===========================================================================
+  const SUA_URL_DO_RENDER = 'https://gametracker-spfg.onrender.com'; 
+
+  // Lógica corrigida: Agora usamos a variável SUA_URL_DO_RENDER explicitamente
+  const API_URL = window.location.hostname.includes('localhost')
+    ? 'http://localhost:3000' 
+    : SUA_URL_DO_RENDER;
+  
+  axios.defaults.baseURL = API_URL;
+
   // --- LOGIN AUTOMÁTICO ---
   const [user, setUser] = useState<any>(() => {
     try {
@@ -64,9 +76,7 @@ function App() {
   });
   
   const [abaAtual, setAbaAtual] = useState('inicio');
-  
-  // Filtro da Biblioteca
-  const [filtroBiblioteca, setFiltroBiblioteca] = useState<'JOGANDO' | 'DESEJO' | 'ZERADO'>('JOGANDO');
+  const [serverError, setServerError] = useState(false);
 
   // Dados Gerais
   const [ofertas, setOfertas] = useState<Game[]>([]);
@@ -79,13 +89,10 @@ function App() {
   // Listas por Loja
   const [gamesSteam, setGamesSteam] = useState<Game[]>([]);
   const [pageSteam, setPageSteam] = useState(0);
-
   const [gamesGOG, setGamesGOG] = useState<Game[]>([]);
   const [pageGOG, setPageGOG] = useState(0);
-
   const [gamesEpic, setGamesEpic] = useState<Game[]>([]);
   const [pageEpic, setPageEpic] = useState(0);
-
   const [lojaAleatoriaNome, setLojaAleatoriaNome] = useState('Geral');
 
   // UI States
@@ -104,18 +111,19 @@ function App() {
   const [paginaTodos, setPaginaTodos] = useState(0);
   const [carregandoTodos, setCarregandoTodos] = useState(false);
   
-  // Auth
+  // Filtro Biblioteca
+  const [filtroBiblioteca, setFiltroBiblioteca] = useState<'JOGANDO' | 'DESEJO' | 'ZERADO'>('JOGANDO');
+
+  // Auth Inputs
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [authError, setAuthError] = useState('');
-  
-  // Inputs
   const [searchQuery, setSearchQuery] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Edit Account
+  // Edit Account Inputs
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [oldPassword, setOldPassword] = useState('');
@@ -124,7 +132,7 @@ function App() {
 
   const DOLAR_HOJE = 6.15;
 
-  // FUNÇÃO AUXILIAR PARA MOSTRAR TOAST
+  // --- FUNÇÕES AUXILIARES ---
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000); 
@@ -132,40 +140,46 @@ function App() {
 
   const formatarPreco = (v: string | number, isRegional: boolean = true) => {
     const n = Number(v);
-    
     if (isNaN(n)) return '-';
     if (n === 0) return 'Grátis';
-    
-    if (isRegional === true) {
-        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
-    } 
+    if (isRegional === true) return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
     
     const convertido = n * DOLAR_HOJE;
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(convertido) + '*';
   };
 
-  // Helper para exibir preço correto na lista de lojas
   const getPrecoLoja = (deal: GameDetailsDeal, jogoBase: Game) => {
-      // Se for Steam (ID 1) e o jogo base já tiver preço regional confirmado
       if (deal.storeID === '1' && jogoBase.isRegionalPrice) {
-          // CORREÇÃO: Verifica salePrice OU cheapest para evitar "Grátis" falso
           const precoReal = jogoBase.salePrice || jogoBase.cheapest || 0;
           return formatarPreco(precoReal, true);
       }
-      // Para outras lojas (USD), passa false para converter
       return formatarPreco(deal.price, false);
   };
 
-  useEffect(() => { 
+  // --- EFEITOS ---
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        await Promise.all([
+          carregarHome(),
+          carregarLojas(),
+          carregarListasIniciais(),
+          carregarTodosJogos(0)
+        ]);
+        setServerError(false); 
+      } catch (e) {
+        console.error("Erro inicial:", e);
+        setServerError(true);
+      }
+    };
+    
     if (user) {
-      carregarHome();
-      carregarLojas();
-      carregarListasIniciais();
-      carregarTodosJogos(0);
+      init();
       setEditName(user.name || ''); 
       setEditEmail(user.email || '');
       carregarBiblioteca(user.id);
-    } 
+    }
   }, [user]);
 
   useEffect(() => {
@@ -185,65 +199,57 @@ function App() {
       if (naLib) setStatusSelecionado(naLib.status);
       else setStatusSelecionado('JOGANDO');
 
-      if (gid) {
-          buscarLojasDetalhadas(gid as string);
-      } else if (title) {
-          buscarGameIdPorTitulo(title as string);
-      } else {
-          setLojasDoJogoSelecionado([]);
-      }
+      if (gid) buscarLojasDetalhadas(gid as string);
+      else if (title) buscarGameIdPorTitulo(title as string);
+      else setLojasDoJogoSelecionado([]);
       
-      if (sid && sid !== 'custom') {
-          buscarDescricaoSteam(sid as string);
-      } else {
-          setDescricaoJogo('Descrição indisponível.');
-      }
+      if (sid && sid !== 'custom') buscarDescricaoSteam(sid as string);
+      else setDescricaoJogo('Descrição indisponível para este título.');
     } else {
       setLojasDoJogoSelecionado([]);
       setDescricaoJogo('');
     }
   }, [jogoSelecionado]);
 
+  // --- API CALLS ---
+
   const carregarLojas = async () => {
     try {
       const resp = await axios.get('https://www.cheapshark.com/api/1.0/stores');
-      setStores(resp.data);
+      if (Array.isArray(resp.data)) setStores(resp.data);
     } catch (e) { console.error('Erro lojas'); }
   }
 
   const carregarListasIniciais = async () => {
+    const lojasRandom = [2, 3, 11, 15, 21];
+    const randomID = lojasRandom[Math.floor(Math.random() * lojasRandom.length)];
     try {
-        const lojasRandom = [2, 3, 11, 15, 21];
-        const randomID = lojasRandom[Math.floor(Math.random() * lojasRandom.length)];
-
-        const [resSteam, resGOG, resEpic, resRandom] = await Promise.all([
-            axios.get('https://www.cheapshark.com/api/1.0/deals?storeID=1&pageSize=10&onSale=1&pageNumber=0'),
-            axios.get('https://www.cheapshark.com/api/1.0/deals?storeID=7&pageSize=10&onSale=1&pageNumber=0'),
-            axios.get('https://www.cheapshark.com/api/1.0/deals?storeID=25&pageSize=10&pageNumber=0'),
-            axios.get(`https://www.cheapshark.com/api/1.0/deals?storeID=${randomID}&pageSize=10&onSale=1`)
-        ]);
-        
-        setGamesSteam(resSteam.data);
-        setGamesGOG(resGOG.data);
-        setGamesEpic(resEpic.data);
-        setOfertas(resRandom.data);
-        setLojaAleatoriaNome(randomID.toString()); 
-    } catch (e) { console.error('Erro ao carregar lojas especificas'); }
+      const [resSteam, resGOG, resEpic, resRandom] = await Promise.all([
+          axios.get('https://www.cheapshark.com/api/1.0/deals?storeID=1&pageSize=10&onSale=1&pageNumber=0'),
+          axios.get('https://www.cheapshark.com/api/1.0/deals?storeID=7&pageSize=10&onSale=1&pageNumber=0'),
+          axios.get('https://www.cheapshark.com/api/1.0/deals?storeID=25&pageSize=10&pageNumber=0'),
+          axios.get(`https://www.cheapshark.com/api/1.0/deals?storeID=${randomID}&pageSize=10&onSale=1`)
+      ]);
+      
+      if(Array.isArray(resSteam.data)) setGamesSteam(resSteam.data);
+      if(Array.isArray(resGOG.data)) setGamesGOG(resGOG.data);
+      if(Array.isArray(resEpic.data)) setGamesEpic(resEpic.data);
+      if(Array.isArray(resRandom.data)) setOfertas(resRandom.data);
+      setLojaAleatoriaNome(randomID.toString()); 
+    } catch(e) { console.error("Erro listas"); }
   }
 
   const carregarMaisLoja = async (storeID: string, page: number, setList: any, setPage: any) => {
       const nextPage = page + 1;
       try {
           const resp = await axios.get(`https://www.cheapshark.com/api/1.0/deals?storeID=${storeID}&pageSize=10&onSale=1&pageNumber=${nextPage}`);
-          if (resp.data && resp.data.length > 0) {
+          if (Array.isArray(resp.data) && resp.data.length > 0) {
               setList((prev: Game[]) => [...prev, ...resp.data]);
               setPage(nextPage);
           } else {
-              showToast('Não há mais jogos para carregar nesta loja.', 'info');
+              showToast('Não há mais jogos.', 'info');
           }
-      } catch (e) {
-          console.error("Erro ao carregar mais", e);
-      }
+      } catch (e) { }
   }
 
   const buscarDescricaoSteam = async (steamId: string) => {
@@ -252,30 +258,25 @@ function App() {
       const proxyUrl = 'https://api.allorigins.win/raw?url=';
       const targetUrl = `https://store.steampowered.com/api/appdetails?appids=${steamId}&l=brazilian`;
       const resp = await axios.get(proxyUrl + encodeURIComponent(targetUrl));
-      
       if (resp.data && resp.data[steamId] && resp.data[steamId].success) {
         setDescricaoJogo(resp.data[steamId].data.short_description);
       } else {
         setDescricaoJogo('Detalhes não disponíveis na Steam.');
       }
-    } catch (e) {
-      setDescricaoJogo('Falha ao carregar descrição.');
-    }
+    } catch (e) { setDescricaoJogo('Falha ao carregar descrição.'); }
   }
 
   const buscarGameIdPorTitulo = async (titulo: string) => {
       setCarregandoLojas(true);
       try {
           const resp = await axios.get(`https://www.cheapshark.com/api/1.0/games?title=${titulo}&limit=1`);
-          if (resp.data && resp.data.length > 0) {
+          if (Array.isArray(resp.data) && resp.data.length > 0) {
               buscarLojasDetalhadas(resp.data[0].gameID);
           } else {
               setLojasDoJogoSelecionado([]);
               setCarregandoLojas(false);
           }
-      } catch (e) {
-          setCarregandoLojas(false);
-      }
+      } catch (e) { setCarregandoLojas(false); }
   }
 
   const buscarLojasDetalhadas = async (gameID: string) => {
@@ -283,11 +284,8 @@ function App() {
     try {
       const resp = await axios.get(`https://www.cheapshark.com/api/1.0/games?id=${gameID}`);
       setLojasDoJogoSelecionado(resp.data.deals || []);
-    } catch (e) {
-      console.error("Erro detalhes", e);
-    } finally {
-      setCarregandoLojas(false);
-    }
+    } catch (e) { console.error("Erro detalhes", e); } 
+    finally { setCarregandoLojas(false); }
   }
 
   const carregarHome = async () => { };
@@ -296,13 +294,11 @@ function App() {
     setCarregandoTodos(true);
     try {
       const resp = await axios.get(`/api/games/deals/ofertas?page=${pagina}&pageSize=12`); 
-      
-      if (resp.data && resp.data.length > 0) {
+      if (Array.isArray(resp.data) && resp.data.length > 0) {
         setTodosJogos(prev => {
           const normalize = (str: string) => str ? str.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
           const listaAtual = pagina === 0 ? [] : [...prev];
           const mapaUnico = new Map();
-          
           listaAtual.forEach(g => mapaUnico.set(normalize(g.title || ''), g));
           resp.data.forEach((g: Game) => {
              const key = normalize(g.title || '');
@@ -321,11 +317,15 @@ function App() {
     setAuthError(''); 
     try { 
       const resp = await axios.post('/api/login', { username, password }); 
-      setUser(resp.data);
-      localStorage.setItem('gametracker_user', JSON.stringify(resp.data));
-      carregarBiblioteca(resp.data.id); 
+      if (resp.data && resp.data.id) {
+          setUser(resp.data);
+          localStorage.setItem('gametracker_user', JSON.stringify(resp.data));
+          carregarBiblioteca(resp.data.id); 
+      } else {
+          setAuthError('Resposta inválida do servidor.');
+      }
     } catch (err: any) { 
-      setAuthError(err.response?.data?.error || 'Falha no login'); 
+      setAuthError(err.response?.data?.error || 'Falha no login. Verifique a API.'); 
     } 
   };
 
@@ -338,24 +338,33 @@ function App() {
       showToast('Conta criada com sucesso! Faça login.'); 
       setIsRegisterMode(false); 
     } catch (err: any) { 
-      setAuthError(err.response?.data?.error || 'Erro ao criar'); 
+      setAuthError(err.response?.data?.error || 'Erro ao criar. Backend está online?'); 
     } 
   };
 
   const carregarBiblioteca = async (uid: number) => { 
     try { 
       const resp = await axios.get(`/api/games/${uid}`); 
-      setMinhaBiblioteca(resp.data); 
-    } catch (e) { } 
+      if (Array.isArray(resp.data)) {
+          setMinhaBiblioteca(resp.data);
+      } else {
+          setMinhaBiblioteca([]);
+      }
+    } catch (e) { 
+        console.error('Erro lib'); 
+        setMinhaBiblioteca([]);
+    } 
   };
 
   const buscarJogos = async () => { 
     if(!searchQuery) return; 
     try { 
       const resp = await axios.get(`/api/games/search?name=${searchQuery}`); 
-      setJogosBusca(resp.data); 
-      setBuscou(true); 
-    } catch (e) { showToast('Erro ao buscar jogos', 'error'); } 
+      if(Array.isArray(resp.data)) {
+        setJogosBusca(resp.data); 
+        setBuscou(true); 
+      }
+    } catch (e) { showToast('Erro ao buscar jogos.', 'error'); } 
   };
   
   const deletarJogo = async (id: number) => { 
@@ -363,9 +372,7 @@ function App() {
       await axios.delete(`/api/games/${id}`); 
       if (user) carregarBiblioteca(user.id);
       showToast('Jogo removido da biblioteca', 'info');
-    } catch (e) {
-      showToast('Erro ao remover jogo', 'error');
-    }
+    } catch (e) { showToast('Erro ao remover jogo', 'error'); }
   };
   
   const salvarOuAtualizarJogo = async (jogo: Game) => {
@@ -406,16 +413,13 @@ function App() {
         carregarBiblioteca(user.id);
         setJogoSelecionado(null);
         setSearchQuery(''); 
-    } catch (e) { showToast('Erro ao salvar o jogo', 'error'); }
+    } catch (e) { showToast('Erro ao salvar. API Offline?', 'error'); }
   };
 
   const atualizarConta = async () => {
-    if (!oldPassword) return showToast('Confirme sua senha atual para salvar.', 'error');
-    if (newPassword && newPassword !== confirmNewPassword) return showToast('Confirmação de senha incorreta.', 'error');
-    
-    if (!editName.trim() || !editEmail.trim()) {
-        return showToast('Nome e Email não podem ser vazios.', 'error');
-    }
+    if (!oldPassword) return showToast('Confirme sua senha atual.', 'error');
+    if (newPassword && newPassword !== confirmNewPassword) return showToast('Senhas não conferem.', 'error');
+    if (!editName.trim() || !editEmail.trim()) return showToast('Campos vazios.', 'error');
 
     try {
         const payload: any = { name: editName, email: editEmail };
@@ -423,9 +427,9 @@ function App() {
         const resp = await axios.put(`/api/users/${user.id}`, payload);
         setUser(resp.data);
         localStorage.setItem('gametracker_user', JSON.stringify(resp.data));
-        showToast('Conta atualizada com sucesso!'); 
+        showToast('Conta atualizada!'); 
         setOldPassword(''); setNewPassword(''); setConfirmNewPassword('');
-    } catch (e) { showToast('Erro ao atualizar conta.', 'error'); }
+    } catch (e) { showToast('Erro ao atualizar.', 'error'); }
   };
 
   const logout = () => { 
@@ -506,9 +510,20 @@ function App() {
             <h1 style={{fontSize: 32, fontWeight: 'bold', margin: '0 0 10px', background: 'linear-gradient(to right, #a78bfa, #f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'}}>GameTracker</h1>
             <p style={{color: '#71717a', fontSize: 14}}>Sua biblioteca definitiva</p>
           </div>
+          
+          {serverError && (
+             <div style={{...styles.errorAlert, background: 'rgba(239,68,68,0.2)', border: '1px solid #ef4444', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: 10}}>
+                <WifiOff size={20} />
+                <span style={{textAlign: 'left'}}>
+                    <b>API Offline (404)</b><br/>
+                    Verifique o "Root Directory" no Render.<br/>
+                    Deve ser: <code>api</code>
+                </span>
+             </div>
+          )}
+
           {authError && <div style={styles.errorAlert}>{authError}</div>}
           
-          {/* TOAST DE LOGIN/CADASTRO */}
           {notification && (
             <div className="toast" style={styles.toast(notification.type)}>
                 {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
@@ -536,6 +551,12 @@ function App() {
   return (
     <div style={{display: 'flex', minHeight: '100vh', width: '100vw'}}>
       <GlobalStyles />
+
+      {serverError && (
+        <div style={{position: 'fixed', top: 0, left: 0, right: 0, background: '#ef4444', color: 'white', textAlign: 'center', padding: 10, fontSize: 13, fontWeight: 'bold', zIndex: 9999}}>
+           ⚠️ Erro Crítico: O Frontend não consegue falar com o Backend. Verifique o Console (F12) para mais detalhes.
+        </div>
+      )}
 
       {notification && (
         <div className="toast" style={styles.toastFloating(notification.type)}>
