@@ -1,30 +1,26 @@
 import express from 'express';
-import cors from 'cors';
-import routes from './routes';
+import cors from 'cors'; // O pacote mágico que libera o acesso
+import routes from './routes'; 
 
 const app = express();
-const PORT = 3000;
 
-// --- CONFIGURAÇÃO DO CORS (O PORTEIRO) ---
-// Isso libera qualquer site (*) de acessar seu servidor
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type']
-}));
-// -----------------------------------------
+// O Render define a porta automaticamente
+const PORT = process.env.PORT || 3000;
+
+// --- A CORREÇÃO ESTÁ AQUI ---
+// app.use(cors()) sem parâmetros libera para TODO MUNDO.
+// É o jeito mais garantido de funcionar agora.
+app.use(cors()); 
 
 app.use(express.json());
 
-// Log para avisar que uma requisição chegou (ajuda a debugar)
-app.use((req, res, next) => {
-  console.log(`> Requisição recebida: ${req.method} ${req.url}`);
-  next();
+// Rota de teste para você ver no navegador se a API está viva
+app.get('/', (req, res) => {
+  res.send('🚀 API GameTracker está rodando e com CORS liberado!');
 });
 
-app.use(routes);
+app.use('/api', routes);
 
 app.listen(PORT, () => {
-  console.log(`🔥 Servidor NOVO rodando na porta ${PORT}`);
-  console.log(`🔓 CORS liberado para todos os sites`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
